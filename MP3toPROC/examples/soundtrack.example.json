@@ -1,0 +1,55 @@
+{
+  "sample_rate": 44100,
+  "start": "forest_dawn",
+  "tracks": {
+    "forest_dawn": "forest_dawn/track.json",
+    "cave_echoes": {
+      "manifest": "cave_echoes/track.json",
+      "gain": 0.9
+    },
+    "battle_rush": "battle_rush/track.json"
+  },
+  "defaults": {
+    "mode": "outro",
+    "quantize": "phrase",
+    "crossfade_seconds": 4.0,
+    "outro_max_seconds": 12,
+    "seam_seconds": 0.12,
+    "lead_seconds": 0.05
+  },
+  "transitions": [
+    {
+      "from": "*",
+      "to": "battle_rush",
+      "mode": "cut",
+      "quantize": "beat",
+      "crossfade_seconds": 1.0,
+      "skip_intro": true
+    },
+    {
+      "from": "battle_rush",
+      "to": "*",
+      "mode": "outro",
+      "quantize": "bar",
+      "crossfade_seconds": 3.0,
+      "outro_max_seconds": 8
+    },
+    {
+      "from": "cave_echoes",
+      "to": "forest_dawn",
+      "outro_from": "tail",
+      "crossfade_seconds": 5.0
+    }
+  ],
+  "events": {
+    "enter_forest": "forest_dawn",
+    "enter_cave": "cave_echoes",
+    "combat_start": "battle_rush",
+    "combat_end": "@previous",
+    "boss_spotted": {
+      "target": "battle_rush",
+      "quantize": "immediate",
+      "crossfade_seconds": 0.3
+    }
+  }
+}
