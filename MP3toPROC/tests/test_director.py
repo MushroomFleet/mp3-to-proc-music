@@ -58,6 +58,20 @@ def main(st):
     assert (rms < 1e-3).sum() < 4, "unexpected silence"
     assert np.abs(x).max() < 1.5
 
+    # retarget while the outro is already playing: outro must keep playing,
+    # only the successor changes (same start time)
+    d2 = MusicDirector(st)
+    run(d2, 40)                                   # forest is now looping
+    r = d2.trigger("enter_cave")
+    while d2.now < r["exit"] + d2.sr:            # step past the exit, into the outro
+        d2.render(1024)
+    outro = [v for v in d2.voices if v.kind == "outro"]
+    assert outro, "outro should be playing"
+    r2 = d2.trigger("goto_battle" if "goto_battle" in d2.events else "battle_rush")
+    assert r2["start"] == r["start"] and r2["exit"] == r["exit"], (r, r2)
+    assert outro[0] in d2.voices, "outro must not be cut"
+    assert d2.pending.track.id == "battle_rush"
+
     try:
         d.trigger("no_such_event")
         raise AssertionError("expected KeyError")

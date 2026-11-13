@@ -72,7 +72,8 @@ def convert(src: str, out_root: str, *, fmt: str = "wav", track_id: Optional[str
             bpm: Optional[float] = None, beats_per_bar: int = 4,
             loop_start_bar: Optional[int] = None, loop_end_bar: Optional[int] = None,
             loop_xfade_ms: float = 40.0, exit_every_bars: int = 4,
-            crossfade_seconds: float = 4.0, plot: bool = True, log=print) -> dict:
+            crossfade_seconds: float = 4.0, plot: bool = True, log=print,
+            also_formats=()) -> dict:
     track_id = track_id or slugify(src)
     out_dir = os.path.join(out_root, track_id)
     os.makedirs(out_dir, exist_ok=True)
@@ -97,6 +98,9 @@ def convert(src: str, out_root: str, *, fmt: str = "wav", track_id: Optional[str
         fn = f"{name}.{ext}"
         if x.shape[1] > 0:
             write_audio(os.path.join(out_dir, fn), x, sr, fmt)
+            for extra in also_formats:  # same audio, other codecs (runtime fallback)
+                if extra != fmt:
+                    write_audio(os.path.join(out_dir, f"{name}.{extra}"), x, sr, extra)
             files[name] = (fn, x.shape[1])
         else:
             files[name] = (None, 0)

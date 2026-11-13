@@ -14,6 +14,7 @@ param(
     [string]$InputDir,
     [string]$OutputDir = ".\proc_out",
     [ValidateSet("ogg", "wav", "flac")] [string]$Format = "ogg",
+    [ValidateSet("ogg", "wav", "flac")] [string[]]$AlsoFormat = @(),
     [int]$Jobs = 0,
     [double]$Crossfade = 4.0,
     [int]$PhraseBars = 4,
@@ -85,6 +86,7 @@ $argsList = @("batch", $InputDir, "-o", $OutputDir, "-f", $Format, "-j", "$Jobs"
               "--crossfade", "$Crossfade", "--phrase-bars", "$PhraseBars")
 if ($Overrides)    { $argsList += @("--overrides", (Resolve-Path $Overrides).Path) }
 if ($SkipExisting) { $argsList += "--skip-existing" }
+foreach ($f in $AlsoFormat) { $argsList += @("--also-format", $f) }
 
 $sw = [Diagnostics.Stopwatch]::StartNew()
 Invoke-Py $argsList

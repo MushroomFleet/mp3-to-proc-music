@@ -96,6 +96,7 @@ class Deck:
     next_iter: int = 0            # abs frame of next loop iteration to schedule
     voices: List[Voice] = field(default_factory=list)
     first_fade: int = 0           # fade-in for the first loop pass when intro is skipped
+    fade: int = 0                 # fade-in length the deck was started with
 
 
 # --------------------------------------------------------------------------- director
@@ -196,7 +197,7 @@ class MusicDirector:
     def _start_deck(self, track: Track, at: int, rule: dict, fade: int = 0) -> Deck:
         skip = rule.get("skip_intro") or track.length("intro") == 0
         loop_start = at if skip else at + track.length("intro")
-        deck = Deck(track=track, start=at, loop_start=loop_start, next_iter=loop_start)
+        deck = Deck(track=track, start=at, loop_start=loop_start, next_iter=loop_start, fade=fade)
         if not skip:
             self._add(Voice(track.buffers["intro"], at, at + track.length("intro"), deck, "intro",
                             fade_in=(at, fade) if fade else None))
@@ -246,12 +247,22 @@ class MusicDirector:
             if self.pending.track is target:
                 return None
             src = self.deck
-            for v in self.pending.voices:
+            old = self.pending
+            for v in old.voices:
                 if v in self.voices:
                     self.voices.remove(v)
             self.pending = None
-            # undo the previous exit on the source deck, then recompute from scratch
-            self._rewind_exit(src)
+            if src.exit_at is not None and src.exit_at > self.now + lead:
+                # the exit hasn't happened yet: undo it and recompute from scratch
+                self._rewind_exit(src)
+            else:
+                # the outro is already playing: keep it, just swap what comes next
+                rule = self._rule(src.track.id, target.id, override)
+                self.pending = self._start_deck(target, old.start, rule, fade=old.fade)
+                self._emit("exit_scheduled", trigger=name, source=src.track.id, target=target.id,
+                           mode="retarget", quantize="-", frame=src.exit_at,
+                           next_start=round(old.start / self.sr, 3))
+                return {"exit": src.exit_at, "start": old.start}
         if self.pending is not None:  # successor already (about to be) audible: promote it
             self.deck, self.pending = self.pending, None
             self.history.append(self.deck.track.id)
@@ -334,13 +345,19 @@ class MusicDirector:
 # --------------------------------------------------------------------------- offline preview
 
 def render_preview(soundtrack: str, script: str, out_wav: str, labels_txt: Optional[str] = None,
-                   block: int = 1024, log=print) -> List[tuple]:
+                   block: int = 1024, log=print, events_json: Optional[str] = None) -> List[tuple]:
     """Render a scripted play-through to a WAV (and an Audacity label file)."""
     with open(script) as f:
         sc = json.load(f)
     labels: List[tuple] = []
+    records: List[dict] = []
+    with open(soundtrack) as f:
+        sr_ = json.load(f).get("sample_rate", 44100)
 
     def on_event(kind, info):
+        rec = {"type": kind}
+        rec.update({k: (round(v / sr_, 6) if k == "frame" else v) for k, v in info.items()})
+        records.append(rec)
         line = f"{info['time']:8.2f}s  {kind:15s} " + " ".join(
             f"{k}={v}" for k, v in info.items() if k not in ("time", "frame"))
         log(line)
@@ -356,6 +373,7 @@ def render_preview(soundtrack: str, script: str, out_wav: str, labels_txt: Optio
     while d.now < total:
         while i < len(events) and events[i]["time"] * d.sr <= d.now:
             log(f"{d.now / d.sr:8.2f}s  >> trigger      {events[i]['event']}")
+            records.append({"type": "trigger", "event": events[i]["event"], "time": round(d.now / d.sr, 6)})
             labels.append((round(d.now / d.sr, 3), "trigger " + events[i]["event"]))
             d.trigger(events[i]["event"])
             i += 1
@@ -365,6 +383,9 @@ def render_preview(soundtrack: str, script: str, out_wav: str, labels_txt: Optio
     if peak > 1.0:
         audio /= peak
     sf.write(out_wav, audio, d.sr, subtype="PCM_16")
+    if events_json:
+        with open(events_json, "w") as f:
+            json.dump({"sample_rate": d.sr, "block": block, "events": records}, f, indent=2)
     if labels_txt:
         with open(labels_txt, "w") as f:
             for t, lab in labels:

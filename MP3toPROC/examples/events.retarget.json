@@ -1,0 +1,9 @@
+{
+  "duration": 120,
+  "events": [
+    { "time": 40, "event": "enter_cave" },
+    { "time": 50, "event": "combat_start" },
+    { "time": 80, "event": "combat_end" },
+    { "time": 81, "event": "boss_spotted" }
+  ]
+}

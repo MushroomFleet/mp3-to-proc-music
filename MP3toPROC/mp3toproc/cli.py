@@ -34,7 +34,8 @@ def _convert_job(args):
 def _kw(a, overrides=None):
     kw = dict(fmt=a.format, bpm=a.bpm, beats_per_bar=a.beats_per_bar,
               loop_xfade_ms=a.loop_xfade_ms, exit_every_bars=a.phrase_bars,
-              crossfade_seconds=a.crossfade, plot=not a.no_plot)
+              crossfade_seconds=a.crossfade, plot=not a.no_plot,
+              also_formats=tuple(a.also_format or ()))
     if overrides:
         kw.update(overrides)
     return kw
@@ -121,7 +122,7 @@ def cmd_preview(a):
     warnings.filterwarnings("ignore")
     from .director import render_preview
     labels = a.labels or os.path.splitext(a.output)[0] + "_labels.txt"
-    render_preview(a.soundtrack, a.script, a.output, labels)
+    render_preview(a.soundtrack, a.script, a.output, labels, events_json=a.events_json)
     print(f"\nWrote {a.output} and {labels} (import labels in Audacity: File > Import > Labels)")
 
 
@@ -163,6 +164,8 @@ def main(argv=None):
         sp.add_argument("--loop-xfade-ms", type=float, default=40.0, help="crossfade baked into loop seam")
         sp.add_argument("--crossfade", type=float, default=4.0, help="default track-to-track crossfade (s)")
         sp.add_argument("--no-plot", action="store_true")
+        sp.add_argument("--also-format", action="append", choices=["wav", "ogg", "flac"],
+                        help="also write segments in this format (e.g. flac fallback for older macOS webviews)")
 
     c = sub.add_parser("convert", help="convert one song")
     c.add_argument("input")
@@ -190,6 +193,7 @@ def main(argv=None):
     v.add_argument("script")
     v.add_argument("-o", "--output", default="preview.wav")
     v.add_argument("--labels")
+    v.add_argument("--events-json", help="write the event timeline as JSON (golden file for engine ports)")
     v.set_defaults(fn=cmd_preview)
 
     pl = sub.add_parser("play", help="live audition with typed triggers")
